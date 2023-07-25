@@ -1,0 +1,5 @@
+# visual studio settings
+bin/
+obj/
+Properties/
+.vs/
