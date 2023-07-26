@@ -4,6 +4,7 @@ using Il2CppVampireSurvivors.UI;
 using Il2CppVampireSurvivors;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using static UnityEngine.Random;
 
 namespace PreferPickups
 {
@@ -43,27 +44,54 @@ namespace PreferPickups
         public class MainGamePage_LevelUp
         {
 
+            //[HarmonyPrefix]
+            //public static bool Prefix(MainGamePage __instance)
+            //{
+            //    Int64 level = Int64.Parse(__instance._LevelText.text.Remove(0, 3));
+            //    if (enabled)
+            //        Melon<PrioritizePickup>.Logger.Msg($"MainGamePage LevelUp! - Prefix: {level}");
+            //    return true;
+            //}
+
+            //[HarmonyPostfix]
+            //public static void Postfix(MainGamePage __instance)
+            //{
+            //    Int64 level = Int64.Parse(__instance._LevelText.text.Remove(0, 3));
+            //    if (enabled)
+            //        Melon<PrioritizePickup>.Logger.Msg($"MainGamePage LevelUp! - Postfix: {level}");
+            //}
+        }
+
+        // OnEnter of ItemFound gui and Receive of the item?
+        [HarmonyPatch(typeof(GameStateItemFound))]
+        public class GameStateItemFound_Patch
+        {
             [HarmonyPrefix]
-            public static bool Prefix(MainGamePage __instance)
+            [HarmonyPatch("Receive")]
+            public static bool Receive_Prefix(GameStateItemFound __instance)
             {
-                Int64 level = Int64.Parse(__instance._LevelText.text.Remove(0, 3));
                 if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg($"MainGamePage LevelUp! - Prefix: {level}");
+                {
+                    Melon<PrioritizePickup>.Logger.Msg("Receive_Prefix");
+                }
                 return true;
             }
 
-            [HarmonyPostfix]
-            public static void Postfix(MainGamePage __instance)
+            [HarmonyPrefix]
+            [HarmonyPatch("OnEnter")]
+            public static bool OnEnter_Prefix(GameStateItemFound __instance)
             {
-                Int64 level = Int64.Parse(__instance._LevelText.text.Remove(0, 3));
                 if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg($"MainGamePage LevelUp! - Postfix: {level}");
+                {
+                    Melon<PrioritizePickup>.Logger.Msg("OnEnter_Prefix");
+                }
+                return true;
             }
         }
 
         // Listens for state change
         [HarmonyPatch(typeof(StateMachine))]
-        public class StateMachine_FireEvent
+        public class StateMachine_Patch
         {
 
             [HarmonyPrefix]
@@ -71,17 +99,74 @@ namespace PreferPickups
             public static bool FireEvent_Prefix(StateMachine __instance, string eventStr)
             {
                 if (enabled)
+                {
+                    // ITEM_FOUND is sent when the gui pops up, not when the item is destroyed.
+                    // SELECT_ARCANA is sent when purple chest gui pops up.
                     Melon<PrioritizePickup>.Logger.Msg($"StateMachine Fired! - Prefix: {eventStr}");
+                
+                    //// All the allowed Transitions from current state?
+                    //Melon<PrioritizePickup>.Logger.Msg($"Transition map size: {__instance.currentTransitionMap.Count}");
+                    //foreach (Il2CppSystem.Collections.Generic.KeyValuePair<string, Il2CppSystem.Type> entry in __instance.currentTransitionMap)
+                    //{
+                    //    Melon<PrioritizePickup>.Logger.Msg($"<{entry.Key}>: <{entry.Value.FullName}>");
+                    //}
+
+                    ////Dictionary<Il2CppSystem.Type, StateMachineState> instanceCache
+                    //// Some sort of history?
+                    //Melon<PrioritizePickup>.Logger.Msg($"instanceCache size: {__instance.instanceCache.Count}");
+                    //foreach (Il2CppSystem.Collections.Generic.KeyValuePair<Il2CppSystem.Type, StateMachineState> entry in __instance.instanceCache)
+                    //{
+                    //    Melon<PrioritizePickup>.Logger.Msg($"<{entry.Key.FullName}>: <{entry.Value.ToString()}>");
+                    //}
+
+                    ////overallTransitionMap
+                    //Melon<PrioritizePickup>.Logger.Msg($"overallTransitionMap size: {__instance.overallTransitionMap.Count}");
+                    //foreach (Il2CppSystem.Collections.Generic.KeyValuePair<Il2CppSystem.Type, Il2CppSystem.Collections.Generic.Dictionary<string, Il2CppSystem.Type>> entry in __instance.overallTransitionMap)
+                    //{
+                    //    Melon<PrioritizePickup>.Logger.Msg($"{entry.Key.FullName}:");
+                    //    foreach (Il2CppSystem.Collections.Generic.KeyValuePair<string, Il2CppSystem.Type> inner in entry.Value)
+                    //    {
+                    //        Melon<PrioritizePickup>.Logger.Msg($"\t{inner.Key}: {inner.Value.FullName}");
+                    //    }
+                    //    Melon<PrioritizePickup>.Logger.Msg("");
+                    //}
+
+                }
                 return true;
             }
 
-            [HarmonyPostfix]
-            [HarmonyPatch("FireEvent")]
-            public static void FireEvent_Postfix(StateMachine __instance)
-            {
-                if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg($"StateMachine Fired! - Postfix");
-            }
+            //[HarmonyPostfix]
+            //[HarmonyPatch("FireEvent")]
+            //public static void FireEvent_Postfix(StateMachine __instance)
+            //{
+            //    if (enabled)
+            //        Melon<PrioritizePickup>.Logger.Msg($"StateMachine Fired! - Postfix");
+            //}
+
+            //[HarmonyPrefix]
+            //[HarmonyPatch("GoToState")]
+            //public static void GoToState_Prefix(StateMachine __instance, Il2CppSystem.Type state)
+            //{
+            //    if (enabled)
+            //        Melon<PrioritizePickup>.Logger.Msg($"GoToState called - Prefix: {state.ToString()}");
+
+            //    if (enabled)
+            //    {
+            //        Melon<PrioritizePickup>.Logger.Msg($"Transition map size: {__instance.currentTransitionMap.Count}");
+            //        foreach (Il2CppSystem.Collections.Generic.KeyValuePair<string, Il2CppSystem.Type> entry in __instance.currentTransitionMap)
+            //        {
+            //            Melon<PrioritizePickup>.Logger.Msg($"<{entry.Key}>: <{entry.Value.ToString()}>"); 
+            //        }
+            //    }
+            //}
+
+            //[HarmonyPrefix]
+            //[HarmonyPatch("AddStateTransition")]
+            //public static void AddStateTransition_Prefix<TFromState, TToState>(StateMachine __instance, string eventStr)
+            //{
+            //    if (enabled)
+            //        Melon<PrioritizePickup>.Logger.Msg($"AddStateTransition called - Prefix: {eventStr}");
+            //}
         }
 
         // D:\SteamLibrary\steamapps\common\Vampire Survivors\MelonLoader\Il2CppAssemblies
