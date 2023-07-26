@@ -13,6 +13,8 @@ using Il2CppVampireSurvivors.Objects.Projectiles;
 using Il2CppVampireSurvivors.Framework.Particles;
 using System.Reflection;
 using System.Xml.Linq;
+using UnityEngine;
+using Il2CppVampireSurvivors.Objects.Pools;
 
 namespace PreferPickups
 {
@@ -45,12 +47,6 @@ namespace PreferPickups
         public override void OnInitializeMelon()
         {
             ValidateConfig();
-
-            Assembly a = typeof(ModInfo).Assembly;
-            foreach (AssemblyName an in a.GetReferencedAssemblies())
-            {
-                Melon<PrioritizePickup>.Logger.Msg("Name={0}, Version={1}, Culture={2}, PublicKey token={3}", an.Name, an.Version, an.CultureInfo.Name, (BitConverter.ToString(an.GetPublicKeyToken())));
-            }
         }
 
         // Listens and logs whenever character levels up pre/post
@@ -76,48 +72,44 @@ namespace PreferPickups
             //}
         }
 
-        [HarmonyPatch]
-        class PatchEverything
-        {
-            static List<string> FoundMethods = new();
-            static IEnumerable<MethodBase> TargetMethods()
-            {
-                Assembly a = AppDomain.CurrentDomain.GetAssemblies().SingleOrDefault(assembly => assembly.GetName().Name == "Il2CppVampireSurvivors.Runtime");
-                IEnumerable<MethodBase> methods = AccessTools.GetTypesFromAssembly(a)
-                    .SelectMany(type => type.GetMethods())
-                    //.Where(method => method.ReturnType != ) // To restrict query.
-                    .Where(method => !method.IsStatic && 
-                        !method.IsVirtual &&
-                        !method.IsSpecialName &&
-                        method.FullDescription().StartsWith("Il2CppVampireSurvivors") &&
-                        !method.FullDescription().Contains("GetStateInstance") &&
-                        !method.FullDescription().Contains("Il2CppVampireSurvivors.Framework.Phaser.PhaserSprite::setVisible") &&
-                        !method.FullDescription().Contains("GravityWell")
-                        )
-                    .Cast<MethodBase>();
-                return methods;
-            }
+        //[HarmonyPatch]
+        //class PatchEverything
+        //{
+        //    static List<string> FoundMethods = new();
+        //    static IEnumerable<MethodBase> TargetMethods()
+        //    {
+        //        Assembly a = AppDomain.CurrentDomain.GetAssemblies().SingleOrDefault(assembly => assembly.GetName().Name == "Il2CppVampireSurvivors.Runtime");
+        //        IEnumerable<MethodBase> methods = AccessTools.GetTypesFromAssembly(a)
+        //            .SelectMany(type => type.GetMethods())
+        //            //.Where(method => method.ReturnType != ) // To restrict query.
+        //            .Where(method => !method.IsStatic && 
+        //                !method.IsVirtual &&
+        //                !method.IsSpecialName &&
+        //                method.FullDescription().StartsWith("Il2CppVampireSurvivors") &&
+        //                !method.FullDescription().Contains("GetStateInstance") &&
+        //                !method.FullDescription().Contains("Il2CppVampireSurvivors.Framework.Phaser.PhaserSprite::setVisible") &&
+        //                !method.FullDescription().Contains("GravityWell")
+        //                )
+        //            .Cast<MethodBase>();
+        //        return methods;
+        //    }
 
-            // postfix all methods in VampireSurvivors
-            static void Prefix(object[] __args, MethodBase __originalMethod)
-            {
-                if (!FoundMethods.Contains(__originalMethod.FullDescription()))
-                {
-                    try
-                    {
-                        FoundMethods.Add(__originalMethod.FullDescription());
-                        // use dynamic code to handle all method calls
-                        var parameters = __originalMethod.GetParameters();
-                        Melon<PrioritizePickup>.Logger.Msg($"Method {__originalMethod.FullDescription()}:");
-                        for (var i = 0; i < __args.Length; i++)
-                            Melon<PrioritizePickup>.Logger.Msg($"{parameters[i].Name} of type {parameters[i].ParameterType} is {__args[i]}");
-                    } catch (Exception e)
-                    {
-                        Melon<PrioritizePickup>.Logger.Error($"Exeception caught: {e}");
-                    }
-                }
-            }
-        }
+        //    // postfix all methods in VampireSurvivors
+        //    static void Prefix(object[] __args, MethodBase __originalMethod)
+        //    {
+        //        try
+        //        {
+        //            // use dynamic code to handle all method calls
+        //            var parameters = __originalMethod.GetParameters();
+        //            Melon<PrioritizePickup>.Logger.Msg($"Method {__originalMethod.FullDescription()}:");
+        //            for (var i = 0; i < __args.Length; i++)
+        //                Melon<PrioritizePickup>.Logger.Msg($"{parameters[i].Name} of type {parameters[i].ParameterType} is {__args[i]}");
+        //        } catch (Exception e)
+        //        {
+        //            Melon<PrioritizePickup>.Logger.Error($"Exeception caught: {e}");
+        //        }
+        //    }
+        //}
 
         // Hide Eyes (Haven't noticed any logs)
         [HarmonyPatch(typeof(ExplosionEye))]
@@ -130,22 +122,64 @@ namespace PreferPickups
                 if (enabled)
                 {
                     Melon<PrioritizePickup>.Logger.Msg("ExplosionEye_Postfix - ExplosionEye Created");
+                    __instance.GetComponent<SpriteRenderer>().enabled = false;
+                    __instance._Trail.enabled = false;
+                    __instance._WarningSprite.enabled = false;
                 }
+            }
+
+            [HarmonyPrefix]
+            [HarmonyPatch("Init")]
+            public static void Init_Prefix(ExplosionEye __instance, float damage, float radius)
+            {
+                Melon<PrioritizePickup>.Logger.Msg($"ExplosionEye_Patch - Init_Prefix - {damage}, {radius}");
             }
         }
 
+        // This seems to work? Seems to disable smoke?
         [HarmonyPatch(typeof(ParticleEmitterManager))]
         public class ParticleEmitterManager_Patch
         {
             [HarmonyPostfix]
             [HarmonyPatch("EmitParticleAt")]
-            public static void EmitParticleAt_Postfix(ExplosionEye __instance)
+            public static void EmitParticleAt_Postfix(ParticleEmitterManager __instance, Vector2 pos, int count)
             {
                 if (enabled)
                 {
-                    Melon<PrioritizePickup>.Logger.Msg("ExplosionEye_Postfix - ExplosionEye Created");
+                    // Melon<PrioritizePickup>.Logger.Msg($"EmitParticile - EmitParticleAt Called {pos} {count}");
+                    __instance.GetComponent<SpriteRenderer>().enabled = false;
                 }
             }
+        }
+
+        // This seems to work?
+        [HarmonyPatch(typeof(GrangattiProjectile))]
+        public class GrangattiProjectile_Patch
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch("InitProjectile")]
+            public static void InitProjectile_Postfix(GrangattiProjectile __instance, BulletPool pool, Weapon weapon, int index)
+            {
+                if (enabled)
+                {
+                    Melon<PrioritizePickup>.Logger.Msg($"GrangattiProjectile - InitProjectile Called pool: {pool._pool._name} weapon: {weapon.name} index: {index}");
+                    __instance._summon.enabled = false;
+                    __instance._renderer.enabled = false;
+                    __instance._spriteRenderer.enabled = false;
+                }
+            }
+
+            //[HarmonyPostfix]
+            //[HarmonyPatch("Awake")]
+            //public static void Awake_Postfix(GrangattiProjectile __instance)
+            //{
+            //    if (enabled)
+            //    {
+            //        Melon<PrioritizePickup>.Logger.Msg("GrangattiProjectile - Awake Called");
+            //        __instance._summon.enabled = false;
+            //        __instance._renderer.enabled = false;
+            //    }
+            //}
         }
 
         // Fireworks? (Haven't noticed any logs)

@@ -14,6 +14,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Il2CppPauseSystem">
+      <HintPath>D:\SteamLibrary\steamapps\common\Vampire Survivors\MelonLoader\Il2CppAssemblies\Il2CppPauseSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppPhaserPort">
+      <HintPath>D:\SteamLibrary\steamapps\common\Vampire Survivors\MelonLoader\Il2CppAssemblies\Il2CppPhaserPort.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppQFSW.MOP2">
+      <HintPath>D:\SteamLibrary\steamapps\common\Vampire Survivors\MelonLoader\Il2CppAssemblies\Il2CppQFSW.MOP2.dll</HintPath>
+    </Reference>
     <Reference Include="Il2CppVampireSurvivors.Runtime">
       <HintPath>D:\SteamLibrary\steamapps\common\Vampire Survivors\MelonLoader\Il2CppAssemblies\Il2CppVampireSurvivors.Runtime.dll</HintPath>
     </Reference>
