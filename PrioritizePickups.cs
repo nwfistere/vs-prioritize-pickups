@@ -5,6 +5,14 @@ using Il2CppVampireSurvivors;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using static UnityEngine.Random;
+using static Il2CppVampireSurvivors.Signals.UISignals;
+using Il2CppInterop.Runtime.Runtime.VersionSpecific.Class;
+using Il2CppVampireSurvivors.Objects;
+using Il2CppVampireSurvivors.Objects.Weapons;
+using Il2CppVampireSurvivors.Objects.Projectiles;
+using Il2CppVampireSurvivors.Framework.Particles;
+using System.Reflection;
+using System.Xml.Linq;
 
 namespace PreferPickups
 {
@@ -37,6 +45,12 @@ namespace PreferPickups
         public override void OnInitializeMelon()
         {
             ValidateConfig();
+
+            Assembly a = typeof(ModInfo).Assembly;
+            foreach (AssemblyName an in a.GetReferencedAssemblies())
+            {
+                Melon<PrioritizePickup>.Logger.Msg("Name={0}, Version={1}, Culture={2}, PublicKey token={3}", an.Name, an.Version, an.CultureInfo.Name, (BitConverter.ToString(an.GetPublicKeyToken())));
+            }
         }
 
         // Listens and logs whenever character levels up pre/post
@@ -62,7 +76,109 @@ namespace PreferPickups
             //}
         }
 
-        // OnEnter of ItemFound gui and Receive of the item?
+        [HarmonyPatch]
+        class PatchEverything
+        {
+            static List<string> FoundMethods = new();
+            static IEnumerable<MethodBase> TargetMethods()
+            {
+                Assembly a = AppDomain.CurrentDomain.GetAssemblies().SingleOrDefault(assembly => assembly.GetName().Name == "Il2CppVampireSurvivors.Runtime");
+                IEnumerable<MethodBase> methods = AccessTools.GetTypesFromAssembly(a)
+                    .SelectMany(type => type.GetMethods())
+                    //.Where(method => method.ReturnType != ) // To restrict query.
+                    .Where(method => !method.IsStatic && 
+                        !method.IsVirtual &&
+                        !method.IsSpecialName &&
+                        method.FullDescription().StartsWith("Il2CppVampireSurvivors") &&
+                        !method.FullDescription().Contains("GetStateInstance") &&
+                        !method.FullDescription().Contains("Il2CppVampireSurvivors.Framework.Phaser.PhaserSprite::setVisible") &&
+                        !method.FullDescription().Contains("GravityWell")
+                        )
+                    .Cast<MethodBase>();
+                return methods;
+            }
+
+            // postfix all methods in VampireSurvivors
+            static void Prefix(object[] __args, MethodBase __originalMethod)
+            {
+                if (!FoundMethods.Contains(__originalMethod.FullDescription()))
+                {
+                    try
+                    {
+                        FoundMethods.Add(__originalMethod.FullDescription());
+                        // use dynamic code to handle all method calls
+                        var parameters = __originalMethod.GetParameters();
+                        Melon<PrioritizePickup>.Logger.Msg($"Method {__originalMethod.FullDescription()}:");
+                        for (var i = 0; i < __args.Length; i++)
+                            Melon<PrioritizePickup>.Logger.Msg($"{parameters[i].Name} of type {parameters[i].ParameterType} is {__args[i]}");
+                    } catch (Exception e)
+                    {
+                        Melon<PrioritizePickup>.Logger.Error($"Exeception caught: {e}");
+                    }
+                }
+            }
+        }
+
+        // Hide Eyes (Haven't noticed any logs)
+        [HarmonyPatch(typeof(ExplosionEye))]
+        public class ExplosionEye_Patch
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch(MethodType.Constructor)]
+            public static void ExplosionEye_Postfix(ExplosionEye __instance)
+            {
+                if (enabled)
+                {
+                    Melon<PrioritizePickup>.Logger.Msg("ExplosionEye_Postfix - ExplosionEye Created");
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(ParticleEmitterManager))]
+        public class ParticleEmitterManager_Patch
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch("EmitParticleAt")]
+            public static void EmitParticleAt_Postfix(ExplosionEye __instance)
+            {
+                if (enabled)
+                {
+                    Melon<PrioritizePickup>.Logger.Msg("ExplosionEye_Postfix - ExplosionEye Created");
+                }
+            }
+        }
+
+        // Fireworks? (Haven't noticed any logs)
+        [HarmonyPatch(typeof(JubileeProjectile))]
+        public class JubileeProjectile_Patch
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch("InitProjectile")]
+            public static void JubileeProjectile_Postfix(JubileeProjectile __instance)
+            {
+                if (enabled)
+                {
+                    Melon<PrioritizePickup>.Logger.Msg("JubileeProjectile_Patch - InitProjectile");
+                }
+            }
+        }
+
+        // GrangattiWeapon (Haven't noticed any logs)
+        [HarmonyPatch(typeof(GrangattiWeapon))]
+        public class GrangattiWeapon_Patch
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch(MethodType.Constructor)]
+            public static void GrangattiWeapon_Postfix(GrangattiWeapon __instance)
+            {
+                if (enabled)
+                {
+                    Melon<PrioritizePickup>.Logger.Msg("GrangattiWeapon_Patch - GrangattiWeapon Created");
+                }
+            }
+        }
+
+        // OnEnter of ItemFound gui and Receive of the item? (Also fires on discard)
         [HarmonyPatch(typeof(GameStateItemFound))]
         public class GameStateItemFound_Patch
         {
@@ -72,7 +188,7 @@ namespace PreferPickups
             {
                 if (enabled)
                 {
-                    Melon<PrioritizePickup>.Logger.Msg("Receive_Prefix");
+                    Melon<PrioritizePickup>.Logger.Msg("GameStateItemFound_Patch - Receive_Prefix");
                 }
                 return true;
             }
@@ -83,13 +199,26 @@ namespace PreferPickups
             {
                 if (enabled)
                 {
-                    Melon<PrioritizePickup>.Logger.Msg("OnEnter_Prefix");
+                    Melon<PrioritizePickup>.Logger.Msg("GameStateItemFound_Patch - OnEnter_Prefix");
                 }
                 return true;
             }
         }
 
+        // TreasureChestCollectedSignal
+        [HarmonyPatch(typeof(TreasureChestCollectedSignal))]
+        public class TreasureChestCollectedSignal_Patch
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch(MethodType.Constructor)]
+            public static void TreasureChestCollectedSignal_Postfix(TreasureChestCollectedSignal __instance)
+            {
+                Melon<PrioritizePickup>.Logger.Msg("TreasureChestCollectedSignal - TreasureChestCollectedSignal_Postfix");
+            }
+        }
+
         // Listens for state change
+        // OPEN_TREASURE for chest open
         [HarmonyPatch(typeof(StateMachine))]
         public class StateMachine_Patch
         {
