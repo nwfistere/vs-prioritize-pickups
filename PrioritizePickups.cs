@@ -38,48 +38,7 @@ namespace PreferPickups
             ValidateConfig();
         }
 
-        [HarmonyPatch(typeof(GoldFeverUIManager), "OnEnable")]
-        public class GoldFeverUIManagerOnEnable_Patch
-        {
-
-            [HarmonyPrefix]
-            public static bool Prefix(GoldFeverUIManager __instance)
-            {
-                if (!enabled) return true;
-                __instance.IntroTween();
-                return false;
-            }
-        }
-
-        // GameStateLevelUp Seems to only trigger when the character isn't maxed out on items.
-        [HarmonyPatch(typeof(GameStateLevelUp), "OnEnter")]
-        public class GameStateLevelUpOnEnter_Patch
-        {
-
-            [HarmonyPrefix]
-            public static bool Prefix(GameStateLevelUp __instance)
-            {
-                if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg("Leveling up! - Pre-OnEnter");
-                return true;
-            }
-        }
-
-        /*        // GameStateLevelUp Seems to only trigger when the character isn't maxed out on items.
-                [HarmonyPatch(typeof(GameStateLevelUp), "OnEnter")]
-                public class GameStateLevelUpOnEnter_Patch
-                {
-
-                    [HarmonyPrefix]
-                    public static bool Prefix(GameStateLevelUp __instance)
-                    {
-                        if (enabled)
-                            Melon<PrioritizePickup>.Logger.Msg("Leveling up! - Pre-OnEnter");
-                        return true;
-                    }
-                }*/
-
-        // This is to force level them up I think
+        // Listens and logs whenever character levels up pre/post
         [HarmonyPatch(typeof(MainGamePage), "LevelUp")]
         public class MainGamePage_LevelUp
         {
@@ -88,64 +47,40 @@ namespace PreferPickups
             public static bool Prefix(MainGamePage __instance)
             {
                 Int64 level = Int64.Parse(__instance._LevelText.text.Remove(0, 3));
-                // This seems to work? Yep, returns during any level up! Int64.Parse(__instance._LevelText.text.Remove(0,3))
                 if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg($"CharacterController LevelUp! - Prefix: {__instance._LevelText.text.Remove(0, 3)}");
+                    Melon<PrioritizePickup>.Logger.Msg($"MainGamePage LevelUp! - Prefix: {level}");
                 return true;
+            }
+
+            [HarmonyPostfix]
+            public static void Postfix(MainGamePage __instance)
+            {
+                Int64 level = Int64.Parse(__instance._LevelText.text.Remove(0, 3));
+                if (enabled)
+                    Melon<PrioritizePickup>.Logger.Msg($"MainGamePage LevelUp! - Postfix: {level}");
             }
         }
 
-        // This is to force level them up I think
-        [HarmonyPatch(typeof(Il2CppVampireSurvivors.Objects.Characters.CharacterController), "LevelUp")]
-        public class CharacterController_LevelUp
+        // Listens for state change
+        [HarmonyPatch(typeof(StateMachine))]
+        public class StateMachine_FireEvent
         {
 
             [HarmonyPrefix]
-            public static bool Prefix(Il2CppVampireSurvivors.Objects.Characters.CharacterController __instance)
+            [HarmonyPatch("FireEvent")]
+            public static bool FireEvent_Prefix(StateMachine __instance, string eventStr)
             {
                 if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg("CharacterController LevelUp! - Prefix");
+                    Melon<PrioritizePickup>.Logger.Msg($"StateMachine Fired! - Prefix: {eventStr}");
                 return true;
             }
-        }
 
-        // FakePlayerUILevelUp Doesn't seem to do anything
-        [HarmonyPatch(typeof(Il2CppVampireSurvivors.App.Objects.FakePlayerUILevelUp), "Update")]
-        public class FakePlayerUILevelUpUpdate_Patch
-        {
-
-            [HarmonyPrefix]
-            public static bool Prefix(Il2CppVampireSurvivors.App.Objects.FakePlayerUILevelUp __instance)
+            [HarmonyPostfix]
+            [HarmonyPatch("FireEvent")]
+            public static void FireEvent_Postfix(StateMachine __instance)
             {
                 if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg("FakePlayerUILevelUp Update! - Prefix");
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(Il2CppVampireSurvivors.App.Objects.FakePlayerUILevelUp), "UpdateLevelDisplay")]
-        public class FakePlayerUILevelUp_UpdateLevelDisplay_Patch
-        {
-
-            [HarmonyPrefix]
-            public static bool Prefix(Il2CppVampireSurvivors.App.Objects.FakePlayerUILevelUp __instance)
-            {
-                if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg("FakePlayerUILevelUp_UpdateLevelDisplay_Patch - Prefix");
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(GameStateLevelUp), "OnExit")]
-        public class GameStateLevelUpOnExit_Patch
-        {
-
-            [HarmonyPrefix]
-            public static bool Postfix(GameStateLevelUp __instance)
-            {
-                if (enabled)
-                    Melon<PrioritizePickup>.Logger.Msg("Leveling up! - Post-OnExit");
-                return true;
+                    Melon<PrioritizePickup>.Logger.Msg($"StateMachine Fired! - Postfix");
             }
         }
 
